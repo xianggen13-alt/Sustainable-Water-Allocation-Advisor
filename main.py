@@ -297,6 +297,16 @@ def build_system() -> MamdaniSystem:
     # Normal water & Agri high → Agri high, others medium
     R([A(groundwater, "normal"), A(d_agri, "high")],
       [C(a_alloc, "high"), C(i_alloc, "medium"), C(h_alloc, "medium")])
+    
+    # Extreme drought & ALL demands high -> prioritize Household > Industry > Agriculture
+    R([A(rainfall, "low"), A(groundwater, "depleted"),
+       A(d_agri, "high"), A(d_ind, "high"), A(d_hh, "high")],
+      [C(h_alloc, "very_high"), C(i_alloc, "medium"), C(a_alloc, "low")], w=1.0)
+
+    # All abundant & ALL demands low -> balanced medium allocation to promote flexibility
+    R([A(rainfall, "high"), A(groundwater, "abundant"),
+       A(d_agri, "low"), A(d_ind, "low"), A(d_hh, "low")],
+      [C(a_alloc, "medium"), C(i_alloc, "medium"), C(h_alloc, "medium")], w=1.0)
 
     # Add all rules
     for rule in rules:
@@ -507,6 +517,25 @@ def plot_allocation_pie(alloc: AllocationResult):
     labels = ["Agriculture", "Industry", "Household"]
     plt.pie(data, labels=labels, autopct="%1.1f%%")
 
+# -----------------------------
+# Visualization (agg_shapes)
+# -----------------------------
+def plot_aggregated_outputs(agg_shapes: Dict[str, List[Tuple[float, float]]]):
+
+    if plt is None:
+        return
+    for out_name, shape in agg_shapes.items():
+        if not shape:
+            continue
+        x, y = zip(*shape)
+        plt.figure()
+        plt.plot(x, y, label=f"{out_name} aggregated μ(x)")
+        plt.fill_between(x, y, alpha=0.2)
+        plt.title(f"Aggregated Output Membership - {out_name}")
+        plt.xlabel("Output value")
+        plt.ylabel("Membership degree")
+        plt.grid(True, linestyle=":", linewidth=0.5)
+        plt.legend()
 
 # -----------------------------
 # CLI & Demo
@@ -546,7 +575,29 @@ def main():
         if plt is not None:
             plt.show()
 
+# --- New: Raw vs Adjusted Allocations bar chart ---
+            if plt is not None:
+                        plt.figure()
+                        plt.title("Raw vs Fairness-Adjusted Allocations")
+                        labels = ["Agriculture", "Industry", "Household"]
+                        raw_vals = [res.raw_agri, res.raw_industry, res.raw_household]
+                        adj_vals = [res.agri, res.industry, res.household]
+                        x = range(len(labels))
+                        width = 0.35
+                        plt.bar([i - width/2 for i in x], raw_vals, width=width, label="Raw")
+                        plt.bar([i + width/2 for i in x], adj_vals, width=width, label="Adjusted")
+                        plt.xticks(x, labels)
+                        plt.ylabel("Allocation (%)")
+                        plt.ylim(0, 100)
+                        plt.legend()
+                        plt.grid(axis="y", linestyle=":", linewidth=0.5)
+            
 
+# --- New: show aggregated output membership shapes (transparency) ---
+            plot_aggregated_outputs(res.reason)
+            
+            if plt is not None:
+                plt.show()
 # -----------------------------
 # Minimal tests (run: python fuzzy_allocator.py --no-plots)
 # -----------------------------
